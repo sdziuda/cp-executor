@@ -1,0 +1,5 @@
+/mnt/c/Users/szymo/OneDrive/Dokumenty/GitHub/cp-executor/sd438422/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/mnt/c/Users/szymo/OneDrive/Dokumenty/GitHub/cp-executor/sd438422/cmake-build-debug/CMakeFiles/edit_cache.dir
+/mnt/c/Users/szymo/OneDrive/Dokumenty/GitHub/cp-executor/sd438422/cmake-build-debug/CMakeFiles/executor.dir
+/mnt/c/Users/szymo/OneDrive/Dokumenty/GitHub/cp-executor/sd438422/cmake-build-debug/CMakeFiles/utils.dir
+/mnt/c/Users/szymo/OneDrive/Dokumenty/GitHub/cp-executor/sd438422/cmake-build-debug/CMakeFiles/err.dir

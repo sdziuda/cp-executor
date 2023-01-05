@@ -1,0 +1,1 @@
+/usr/bin/cc -g -Wall -Wextra -Wno-sign-compare -g  -rdynamic CMakeFiles/executor2.dir/executor2.c.o  -o executor2  liberr.a -lpthread 

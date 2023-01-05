@@ -1,0 +1,40 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/mnt/c/Users/szymo/OneDrive/Dokumenty/GitHub/cp-executor/sd438422/err.h
+stdnoreturn.h
+-
+
+/mnt/c/Users/szymo/OneDrive/Dokumenty/GitHub/cp-executor/sd438422/executor.c
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+unistd.h
+-
+semaphore.h
+-
+stdbool.h
+-
+sys/mman.h
+-
+sys/wait.h
+-
+utils.h
+/mnt/c/Users/szymo/OneDrive/Dokumenty/GitHub/cp-executor/sd438422/utils.h
+err.h
+/mnt/c/Users/szymo/OneDrive/Dokumenty/GitHub/cp-executor/sd438422/err.h
+
+/mnt/c/Users/szymo/OneDrive/Dokumenty/GitHub/cp-executor/sd438422/utils.h
+stdbool.h
+-
+stdio.h
+-
+
