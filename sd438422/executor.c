@@ -3,7 +3,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <semaphore.h>
-#include <stdbool.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include "utils.h"
@@ -12,8 +11,7 @@
 enum {
     MAX_TASKS = 4096,
     MAX_INPUT_LENGTH = 512,
-    MAX_OUTPUT_LENGTH = 1024,
-    DEBUG = false
+    MAX_OUTPUT_LENGTH = 1024
 };
 
 struct TaskOutput {
@@ -203,6 +201,21 @@ void shared_storage_init(SharedStorage *shared_storage) {
     }
 }
 
+void shared_storage_destroy(SharedStorage *shared_storage, int task_count) {
+    ASSERT_SYS_OK(sem_wait(&shared_storage->mutex));
+    for (int i = 0; i < task_count; i++) {
+        kill(shared_storage->task_pids[i], SIGKILL);
+    }
+    ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
+
+    ASSERT_SYS_OK(sem_destroy(&shared_storage->mutex));
+    for (int i = 0; i < MAX_TASKS; i++) {
+        ASSERT_SYS_OK(sem_destroy(&shared_storage->pid_already_set[i]));
+    }
+
+    ASSERT_SYS_OK(munmap(shared_storage, sizeof(SharedStorage)));
+}
+
 int main(void) {
     int task_number = 0;
     char buffer[MAX_INPUT_LENGTH];
@@ -230,30 +243,16 @@ int main(void) {
         char **line = split_string(buffer);
 
         if (strcmp(line[0], "run") == 0) {
-            if (DEBUG) printf("run\n");
-
             exec_run(task_number++, line, shared_storage);
         } else if (strcmp(line[0], "out") == 0) {
-            if (DEBUG) printf("out\n");
-
             exec_out(line[1], shared_storage);
         } else if (strcmp(line[0], "err") == 0) {
-            if (DEBUG) printf("err\n");
-
             exec_err(line[1], shared_storage);
         } else if (strcmp(line[0], "kill") == 0) {
-            if (DEBUG) printf("kill\n");
-
             exec_kill(line[1], shared_storage);
         } else if (strcmp(line[0], "sleep") == 0) {
-            if (DEBUG) printf("sleep\n");
-
             exec_sleep(line[1]);
-
-            if (DEBUG) printf("sleep done\n");
         } else if (strcmp(line[0], "quit") == 0) {
-            if (DEBUG) printf("quit\n");
-
             free_split_string(line);
             break;
         }
@@ -261,18 +260,7 @@ int main(void) {
         free_split_string(line);
     }
 
-    ASSERT_SYS_OK(sem_wait(&shared_storage->mutex));
-    for (int i = 0; i < task_number; i++) {
-        kill(shared_storage->task_pids[i], SIGKILL);
-    }
-    ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
-
-    ASSERT_SYS_OK(sem_destroy(&shared_storage->mutex));
-    for (int i = 0; i < MAX_TASKS; i++) {
-        ASSERT_SYS_OK(sem_destroy(&shared_storage->pid_already_set[i]));
-    }
-
-    ASSERT_SYS_OK(munmap(shared_storage, sizeof(SharedStorage)));
+    shared_storage_destroy(shared_storage, task_number);
 
     return 0;
 }
