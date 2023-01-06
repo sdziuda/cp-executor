@@ -71,6 +71,7 @@ bool read_line(char* buffer, size_t size_of_buffer, FILE* file)
             syserr("Getline failed.");
         assert(feof(file));
         buffer[0] = '\0';
+        free(line);
         return false;
     }
 

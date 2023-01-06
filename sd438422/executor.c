@@ -54,6 +54,7 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
         ASSERT_SYS_OK(close(pipe_out_dsc[1]));
         ASSERT_SYS_OK(close(pipe_err_dsc[0]));
         ASSERT_SYS_OK(close(pipe_err_dsc[1]));
+        free_split_string(args);
 
         char buff[MAX_OUTPUT_LENGTH];
         FILE* pipe_out = fdopen(pipe_out_dsc[0], "r");
@@ -83,6 +84,7 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
         ASSERT_SYS_OK(close(pipe_out_dsc[0]));
         ASSERT_SYS_OK(close(pipe_out_dsc[1]));
         ASSERT_SYS_OK(close(pipe_err_dsc[1]));
+        free_split_string(args);
 
         char buff[MAX_OUTPUT_LENGTH];
         FILE* pipe_err = fdopen(pipe_err_dsc[0], "r");
@@ -139,6 +141,7 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
         ASSERT_SYS_OK(close(pipe_out_dsc[1]));
         ASSERT_SYS_OK(close(pipe_err_dsc[0]));
         ASSERT_SYS_OK(close(pipe_err_dsc[1]));
+        free_split_string(args);
         ASSERT_SYS_OK(sem_wait(&shared_storage->pid_already_set[task_number]));
 
         int status;
