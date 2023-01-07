@@ -14,28 +14,20 @@ enum {
     MAX_OUTPUT_LENGTH = 1024
 };
 
-struct TaskOutput {
-    char stdout[MAX_OUTPUT_LENGTH];
-    char stderr[MAX_OUTPUT_LENGTH];
-};
-typedef struct TaskOutput TaskOutput;
-
 struct SharedStorage {
-    TaskOutput task_outputs[MAX_TASKS];
-    pid_t task_pids[MAX_TASKS];
-    int task_count;
+    char task_out[MAX_TASKS][MAX_OUTPUT_LENGTH];
+    char task_err[MAX_TASKS][MAX_OUTPUT_LENGTH];
+    pid_t task_pid[MAX_TASKS];
+    bool finished[MAX_TASKS];
+
     sem_t mutex;
     sem_t exec;
-    sem_t pid_already_set[MAX_TASKS];
+    sem_t pid_available[MAX_TASKS];
 };
 typedef struct SharedStorage SharedStorage;
 
 void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
     ASSERT_SYS_OK(sem_wait(&shared_storage->exec));
-
-    ASSERT_SYS_OK(sem_wait(&shared_storage->mutex));
-    shared_storage->task_count++;
-    ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
 
     char **task_args = &args[1];
     if (!task_args[0]) {
@@ -45,7 +37,6 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
     int pipe_out_dsc[2], pipe_err_dsc[2];
     ASSERT_SYS_OK(pipe(pipe_out_dsc));
     ASSERT_SYS_OK(pipe(pipe_err_dsc));
-
 
     pid_t pid_out = fork();
     ASSERT_SYS_OK(pid_out);
@@ -69,7 +60,7 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
             }
 
             ASSERT_SYS_OK(sem_wait(&shared_storage->mutex));
-            strncpy(shared_storage->task_outputs[task_number].stdout, buff, MAX_OUTPUT_LENGTH);
+            strncpy(shared_storage->task_out[task_number], buff, MAX_OUTPUT_LENGTH);
             ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
         }
 
@@ -99,7 +90,7 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
             }
 
             ASSERT_SYS_OK(sem_wait(&shared_storage->mutex));
-            strncpy(shared_storage->task_outputs[task_number].stderr, buff, MAX_OUTPUT_LENGTH);
+            strncpy(shared_storage->task_err[task_number], buff, MAX_OUTPUT_LENGTH);
             ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
         }
 
@@ -127,8 +118,8 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
             ASSERT_SYS_OK(close(pipe_out_dsc[1]));
             ASSERT_SYS_OK(close(pipe_err_dsc[1]));
 
-            shared_storage->task_pids[task_number] = getpid();
-            ASSERT_SYS_OK(sem_post(&shared_storage->pid_already_set[task_number]));
+            shared_storage->task_pid[task_number] = getpid();
+            ASSERT_SYS_OK(sem_post(&shared_storage->pid_available[task_number]));
             ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
             ASSERT_SYS_OK(sem_post(&shared_storage->exec));
 
@@ -143,15 +134,19 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
         ASSERT_SYS_OK(close(pipe_err_dsc[0]));
         ASSERT_SYS_OK(close(pipe_err_dsc[1]));
         free_split_string(args);
-        ASSERT_SYS_OK(sem_wait(&shared_storage->pid_already_set[task_number]));
+        ASSERT_SYS_OK(sem_wait(&shared_storage->pid_available[task_number]));
+
+        pid_t task_pid = shared_storage->task_pid[task_number];
+
+        ASSERT_SYS_OK(sem_post(&shared_storage->pid_available[task_number]));
 
         int status;
-        pid_t pid = waitpid(shared_storage->task_pids[task_number], &status, 0);
-        ASSERT_SYS_OK(pid);
+        pid_t wait_res = waitpid(task_pid, &status, 0);
+        ASSERT_SYS_OK(wait_res);
         ASSERT_SYS_OK(sem_wait(&shared_storage->exec));
 
         ASSERT_SYS_OK(sem_wait(&shared_storage->mutex));
-        shared_storage->task_count--;
+        shared_storage->finished[task_number] = true;
         ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
 
         if (WIFEXITED(status)) {
@@ -174,7 +169,7 @@ void exec_out(char *arg, SharedStorage *shared_storage) {
     ASSERT_SYS_OK(sem_wait(&shared_storage->mutex));
 
     printf("Task %ld stdout: \'%s\'.\n", task_number,
-           shared_storage->task_outputs[task_number].stdout);
+           shared_storage->task_out[task_number]);
     ASSERT_SYS_OK(fflush(stdout));
 
     ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
@@ -190,7 +185,7 @@ void exec_err(char *arg, SharedStorage *shared_storage) {
     ASSERT_SYS_OK(sem_wait(&shared_storage->mutex));
 
     printf("Task %ld stderr: \'%s\'.\n", task_number,
-           shared_storage->task_outputs[task_number].stderr);
+           shared_storage->task_err[task_number]);
     ASSERT_SYS_OK(fflush(stdout));
 
     ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
@@ -203,7 +198,13 @@ void exec_kill(char *arg, SharedStorage *shared_storage) {
 
     long task_number = strtol(arg, NULL, 10);
 
-    kill(shared_storage->task_pids[task_number], SIGINT);
+    ASSERT_SYS_OK(sem_wait(&shared_storage->pid_available[task_number]));
+
+    if (!shared_storage->finished[task_number]) {
+        kill(shared_storage->task_pid[task_number], SIGINT);
+    }
+
+    ASSERT_SYS_OK(sem_post(&shared_storage->pid_available[task_number]));
 
     ASSERT_SYS_OK(sem_post(&shared_storage->exec));
 }
@@ -218,7 +219,8 @@ void shared_storage_init(SharedStorage *shared_storage) {
     ASSERT_SYS_OK(sem_init(&shared_storage->mutex, 1, 1));
     ASSERT_SYS_OK(sem_init(&shared_storage->exec, 1, 1));
     for (int i = 0; i < MAX_TASKS; i++) {
-        ASSERT_SYS_OK(sem_init(&shared_storage->pid_already_set[i], 1, 0));
+        shared_storage->finished[i] = false;
+        ASSERT_SYS_OK(sem_init(&shared_storage->pid_available[i], 1, 0));
     }
 }
 
@@ -226,8 +228,15 @@ void shared_storage_destroy(SharedStorage *shared_storage, int task_count) {
     ASSERT_SYS_OK(sem_wait(&shared_storage->exec));
     ASSERT_SYS_OK(sem_wait(&shared_storage->mutex));
     for (int i = 0; i < task_count; i++) {
-        if (shared_storage->task_pids[i] != 0 && shared_storage->task_pids[i] != getpid()) {
-            kill(shared_storage->task_pids[i], SIGKILL);
+        if (shared_storage->task_pid[i] != 0 && shared_storage->task_pid[i] != getpid()) {
+            ASSERT_SYS_OK(sem_wait(&shared_storage->pid_available[i]));
+
+            if (!shared_storage->finished[i]) {
+                kill(shared_storage->task_pid[i], SIGKILL);
+                shared_storage->finished[i] = true;
+            }
+
+            ASSERT_SYS_OK(sem_post(&shared_storage->pid_available[i]));
         }
     }
     ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
@@ -236,7 +245,7 @@ void shared_storage_destroy(SharedStorage *shared_storage, int task_count) {
     ASSERT_SYS_OK(sem_destroy(&shared_storage->mutex));
     ASSERT_SYS_OK(sem_destroy(&shared_storage->exec));
     for (int i = 0; i < MAX_TASKS; i++) {
-        ASSERT_SYS_OK(sem_destroy(&shared_storage->pid_already_set[i]));
+        ASSERT_SYS_OK(sem_destroy(&shared_storage->pid_available[i]));
     }
 
     ASSERT_SYS_OK(munmap(shared_storage, sizeof(SharedStorage)));
