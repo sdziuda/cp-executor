@@ -41,7 +41,7 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
 
     pid_t pid_out = fork();
     ASSERT_SYS_OK(pid_out);
-    if (!pid_out) { // buff_out
+    if (!pid_out) {
         ASSERT_SYS_OK(close(STDIN_FILENO));
         ASSERT_SYS_OK(close(pipe_out_dsc[1]));
         ASSERT_SYS_OK(close(pipe_err_dsc[0]));
@@ -71,7 +71,7 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
 
     pid_t pid_err = fork();
     ASSERT_SYS_OK(pid_err);
-    if (!pid_err) { // buff_err
+    if (!pid_err) {
         ASSERT_SYS_OK(close(STDIN_FILENO));
         ASSERT_SYS_OK(close(pipe_out_dsc[0]));
         ASSERT_SYS_OK(close(pipe_out_dsc[1]));
@@ -101,10 +101,10 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
 
     pid_t pid_wait = fork();
     ASSERT_SYS_OK(pid_wait);
-    if (!pid_wait) { // wait
+    if (!pid_wait) {
         pid_t pid_task = fork();
         ASSERT_SYS_OK(pid_task);
-        if (!pid_task) { // task
+        if (!pid_task) {
             ASSERT_SYS_OK(close(STDIN_FILENO));
             ASSERT_SYS_OK(sem_wait(&shared_storage->mutex));
             printf("Task %d started: pid %d.\n", task_number, getpid());
