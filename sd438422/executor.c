@@ -23,6 +23,7 @@ struct SharedStorage {
     sem_t mutex;
     sem_t exec;
     sem_t pid_available[MAX_TASKS];
+    sem_t pid_killed[MAX_TASKS];
 };
 typedef struct SharedStorage SharedStorage;
 
@@ -156,6 +157,7 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
         }
         ASSERT_SYS_OK(fflush(stdout));
 
+        ASSERT_SYS_OK(sem_post(&shared_storage->pid_killed[task_number]));
         ASSERT_SYS_OK(sem_post(&shared_storage->exec));
         exit(0);
     }
@@ -221,6 +223,7 @@ void shared_storage_init(SharedStorage *shared_storage) {
     for (int i = 0; i < MAX_TASKS; i++) {
         shared_storage->finished[i] = false;
         ASSERT_SYS_OK(sem_init(&shared_storage->pid_available[i], 1, 0));
+        ASSERT_SYS_OK(sem_init(&shared_storage->pid_killed[i], 1, 0));
     }
 }
 
@@ -237,6 +240,8 @@ void shared_storage_destroy(SharedStorage *shared_storage, int task_count) {
             }
 
             ASSERT_SYS_OK(sem_post(&shared_storage->pid_available[i]));
+
+            ASSERT_SYS_OK(sem_wait(&shared_storage->pid_killed[i]));
         }
     }
     ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
@@ -246,6 +251,7 @@ void shared_storage_destroy(SharedStorage *shared_storage, int task_count) {
     ASSERT_SYS_OK(sem_destroy(&shared_storage->exec));
     for (int i = 0; i < MAX_TASKS; i++) {
         ASSERT_SYS_OK(sem_destroy(&shared_storage->pid_available[i]));
+        ASSERT_SYS_OK(sem_destroy(&shared_storage->pid_killed[i]));
     }
 
     ASSERT_SYS_OK(munmap(shared_storage, sizeof(SharedStorage)));
