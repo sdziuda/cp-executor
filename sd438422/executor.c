@@ -161,6 +161,11 @@ void exec_run(int task_number, char **args, SharedStorage *shared_storage) {
         ASSERT_SYS_OK(sem_post(&shared_storage->exec));
         exit(0);
     }
+
+    ASSERT_SYS_OK(close(pipe_out_dsc[0]));
+    ASSERT_SYS_OK(close(pipe_out_dsc[1]));
+    ASSERT_SYS_OK(close(pipe_err_dsc[0]));
+    ASSERT_SYS_OK(close(pipe_err_dsc[1]));
 }
 
 void exec_out(char *arg, SharedStorage *shared_storage) {
