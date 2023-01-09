@@ -240,12 +240,14 @@ void shared_storage_destroy(SharedStorage *shared_storage, int task_count) {
             }
 
             ASSERT_SYS_OK(sem_post(&shared_storage->pid_available[i]));
-
-            ASSERT_SYS_OK(sem_wait(&shared_storage->pid_killed[i]));
         }
     }
     ASSERT_SYS_OK(sem_post(&shared_storage->mutex));
     ASSERT_SYS_OK(sem_post(&shared_storage->exec));
+
+    for (int i = 0; i < task_count; i++) {
+        ASSERT_SYS_OK(sem_wait(&shared_storage->pid_killed[i]));
+    }
 
     ASSERT_SYS_OK(sem_destroy(&shared_storage->mutex));
     ASSERT_SYS_OK(sem_destroy(&shared_storage->exec));
